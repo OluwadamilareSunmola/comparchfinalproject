@@ -3,7 +3,7 @@ Term Project: Math-Match Game (Multiply Easy)
 Overview
 The topic for the term project this semester is the Math-match game, option “Multiply Easy”. For a feel of the game, visit Math Match Game and choose the option “Multiply Easy”.
 
-Note: MARS does not have graphic capability, so an ASCII characters-based board is sufficient.
+
 
 Minimum Requirements
 Single Player: The game is for one player. The program provides the game environment for the user.
