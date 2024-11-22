@@ -1,12 +1,16 @@
 .data
     brain_art: .asciiz "                       _____\n                   .d88888888bo.\n                 .d8888888888888b.\n                 8888888888888888b\n                 888888888888888888\n                 888888888888888888\n                  Y8888888888888888\n            ,od888888888888888888P\n         .'`Y8P'```'Y8888888888P'\n       .'_   `  _     'Y88888888b\n      /  _`    _ `      Y88888888b   ____\n   _  | /  \\  /  \\      8888888888.d888888b.\n  d8b | | /|  | /|      8888888888d8888888888b\n 8888_\\ \\_|/  \\_|/      d888888888888888888888b\n .Y8P  `'-.            d88888888888888888888888\n/          `          `      `Y8888888888888888\n|                        __    888888888888888P\n \\                       / `   dPY8888888888P'\n  '._                  .'     .'  `Y888888P`\n     `\"'-.,__    ___.-'    .-'\n         `-._````  __..--'`\n                 ``````\n"
-    brain_title:    .asciiz "Welcome to Math Memory Match!\n"
-    display_cards:  .asciiz "\n********** Display Cards **********\n"
+brain_title:    .asciiz "\n╔═══════════════════════════════════════════════╗\n║   🧮 Welcome to MATH MEMORY MASTER! 🧮       ║\n║      Test Your Memory & Math Skills!          ║\n╚═══════════════════════════════════════════════╝\n"
+
+display_cards:  .asciiz "\n\n\n╭────────── ;)Game Board 🎴 ──────────╮\n│   Can you match all the pairs?           │\n│   Remember: Numbers & Equations Match!    │\n╰──────────────────────────────────────────╯\n"
     # Game state variables
     pairs_remaining: .word 8          # Start with 8 pairs (16 cards)
     matched_arr:     .word 0:16       # Track revealed cards (0=hidden, 1=revealed)
     score:          .word 0           # Player's score
 
+    restart_prompt:  .asciiz "\n\n\n\nuld you like to play again? (1 for yes, 0 for no): "
+    invalid_restart: .asciiz "\nPlease enter 0 or 1 only.\n"
+    goodbye_msg:     .asciiz "\n\nThanks for playing! Goodbye!\n"
     
     # Timer variables
     start_time_low:  .word 0          # Low word of start time
@@ -14,9 +18,9 @@
     time_msg:       .asciiz "Time elapsed: "
     colon:          .asciiz ":"
     zero:           .asciiz "0"
-
-    # Main game banner and frames
-    game_banner:    .asciiz "\n╔════════════════════════════════════════╗\n║  🎮 MATH MEMORY MATCHING CHALLENGE 🎮  ║\n╚════════════════════════════════════════╝\n    🧮 Test Your Math & Memory! 🧠\n"
+    
+    matches_found: .word 0
+    
     
     # Basic display elements
     divider:        .asciiz "\n----------------------------------------\n"
@@ -116,12 +120,12 @@
 
     score_art:          .asciiz "🏆 "
 
-    success_duration: .word 1000    # Duration in milliseconds
-    failure_duration: .word 500     # Duration in milliseconds
-    success_pitch:    .word 72      # High C note
-    failure_pitch:    .word 50      # Lower note
-    success_volume:   .word 127     # Maximum volume
-    failure_volume:   .word 100     # Slightly lower volume
+    success_duration: .word 1200    # Duration in milliseconds
+    failure_duration: .word 1000     # Duration in milliseconds
+    success_pitch:    .word 100      # High C note
+    failure_pitch:    .word 290      # Lower note
+    success_volume:   .word 250    # Maximum volume
+    failure_volume:   .word 127     # Slightly lower volume
     success_instrument: .word 9     # Glockenspiel (bright, happy sound)
     failure_instrument: .word 114   # Steel Drums (distinctive sound)
 .text
@@ -129,25 +133,42 @@
 
 main:
     # Initialize game state
+    j game_start
+
+
+game_start:
     jal init_game
-    
-    # Main game loop
-    game_loop:
+game_loop:
         # Display current state
-        jal display_game_state
+    jal display_game_state
         
         # Get and process player moves
-        jal get_player_move
+    jal get_player_move
         
         # Check if game is over
-        jal check_game_over
-        beq $v0, $zero, game_loop    # If not over, continue loop
+    jal check_game_over
+    beq $v0, $zero, game_loop    # If not over, continue loop
         
-    # Game over cleanup and exit
+    # Game over, display results
     jal display_final_results
-    li $v0, 10      # Exit program
+    li $v0, 4
+    la $a0, restart_prompt
     syscall
-
+    
+    # Read player choice
+    li $v0, 5
+    syscall
+    
+    # Check input validity
+    beqz $v0, end_game          # If input is 0, end game
+    li $t0, 1
+    beq $v0, $t0, game_start    # If input is 1, restart game
+    
+    # Invalid input, display error and loop back
+    li $v0, 4
+    la $a0, invalid_restart
+    syscall
+    j game_loop                 # Loop back for another try
 # Initialize game state and grid
 init_game:
     # Prologue
@@ -495,6 +516,8 @@ get_player_move:
     # Load addresses
     la $s2, grid1            # Load grid base address
     la $s3, matched_arr      # Load matched array base address
+    
+    
 
 get_first_card:
     # Prompt for first card
@@ -583,7 +606,7 @@ get_second_card:
     # If no match found
     beqz $v0, no_match_found
 
-    # Update matched status and score for match
+    # It's a match! Update matched status and score
     sll $t0, $s0, 2
     sll $t1, $s1, 2
     add $t0, $s3, $t0
@@ -599,21 +622,62 @@ get_second_card:
     lw $a3, success_volume
     jal play_sound
 
+    # Show celebration art (alternate between the two)
+    lw $t0, matches_found
+    addi $t0, $t0, 1        # Increment matches found
+    sw $t0, matches_found
+    andi $t1, $t0, 1        # Get last bit to alternate
+    beqz $t1, show_cele1
+
+    # Show celebration art 2
+    li $v0, 4
+    la $a0, celebration_art2
+    syscall
+    j after_cele
+
+show_cele1:
+    li $v0, 4
+    la $a0, celebration_art1
+    syscall
+
+after_cele:
+    # Show random match message
+    li $v0, 42              # Random int syscall
+    li $a0, 0              # Generator 0
+    li $a1, 4              # Upper bound (0-3)
+    syscall
+    
+    sll $t0, $a0, 2        # Multiply by 4 to get offset
+    la $t1, match_msgs     # Load base of messages array
+    add $t1, $t1, $t0      # Add offset
+    lw $a0, ($t1)          # Load message address
+    li $v0, 4
+    syscall
+
     # Update score and pairs remaining
     lw $t0, score
-    addi $t0, $t0, 10        # Add 10 points
+    addi $t0, $t0, 10      # Add 10 points
     sw $t0, score
 
     lw $t0, pairs_remaining
-    addi $t0, $t0, -1        # Decrease pairs remaining
+    addi $t0, $t0, -1      # Decrease pairs remaining
     sw $t0, pairs_remaining
 
+    # Check if halfway
+    li $t1, 4
+    bne $t0, $t1, skip_halfway
+    
+    # Show halfway message
+    li $v0, 4
+    la $a0, half_way
+    syscall
+
+skip_halfway:
     # Display match message
     li $v0, 4
     la $a0, match_found
     syscall
     j move_complete
-
 play_sound:
     # Parameters:
     # $a0 = pitch (0-127)
@@ -667,7 +731,20 @@ no_match_found:
     add $t0, $s3, $t0
     sw $zero, ($t0)          # Hide second card
    
-    # Display no match message
+    # Show random no-match message
+    li $v0, 42              # Random int syscall
+    li $a0, 0              # Generator 0
+    li $a1, 4              # Upper bound (0-3)
+    syscall
+    
+    sll $t0, $a0, 2        # Multiply by 4 to get offset
+    la $t1, no_match_msgs  # Load base of messages array
+    add $t1, $t1, $t0      # Add offset
+    lw $a0, ($t1)          # Load message address
+    li $v0, 4
+    syscall
+    
+    # Display standard no match message
     li $v0, 4
     la $a0, no_match
     syscall
@@ -685,7 +762,6 @@ no_match_found:
     addi $sp, $sp, 8
     
     j move_complete
-    
 move_complete:
     # Update moves counter
     #lw $t0, moves
@@ -841,6 +917,17 @@ convert_end:
     addi $sp, $sp, 16
     jr $ra
 
+    
+
+end_game:
+    # Display goodbye message
+    li $v0, 4
+    la $a0, goodbye_msg
+    syscall
+    
+    # Exit program
+    li $v0, 10
+    syscall
 # Compare strings by evaluating their values
 compare_strings:
     # Prologue
@@ -1021,3 +1108,4 @@ print_seconds:
     lw $ra, 20($sp)
     addi $sp, $sp, 24
     jr $ra
+
