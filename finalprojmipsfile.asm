@@ -603,6 +603,10 @@ get_second_card:
     lw $t0, score
     addi $t0, $t0, 10        # Add 10 points
     sw $t0, score
+    
+    #Display current timer
+    jal display_elapsed_time
+    jr $ra
 
     lw $t0, pairs_remaining
     addi $t0, $t0, -1        # Decrease pairs remaining
@@ -1020,4 +1024,52 @@ print_seconds:
     lw $s0, 16($sp)
     lw $ra, 20($sp)
     addi $sp, $sp, 24
+    jr $ra
+    
+# Calculate and display elapsed time
+display_elapsed_time:
+    li $v0, 30          # Get system time
+    syscall             # Returns time in $a0 (low) and $a1 (high)
+
+    # Load start time
+    lw $t0, start_time_low
+    lw $t1, start_time_high
+
+    # Calculate elapsed time (current time - start time)
+    sub $t2, $a0, $t0   # Low word difference
+    sub $t3, $a1, $t1   # High word difference (if needed, handle overflow)
+
+    # Convert milliseconds to seconds
+    divu $t4, $t2, 1000 # $t4 = elapsed seconds
+
+    # Calculate minutes and seconds
+    divu $t5, $t4, 60   # $t5 = elapsed minutes
+    mfhi $t6            # $t6 = remaining seconds
+
+    # Print a new line for clarity
+    la $a0, newline     # Load newline character
+    li $v0, 4
+    syscall
+
+    # Prepare the output message
+    la $a0, time_msg
+    li $v0, 4
+    syscall             # Print "Time elapsed: "
+
+    # Print minutes
+    move $a0, $t5       # Load minutes
+    li $v0, 1           # Print integer
+    syscall
+
+    # Print colon separator
+    la $a0, colon
+    li $v0, 4
+    syscall
+
+    # Print seconds
+    move $a0, $t6       # Load seconds
+    li $v0, 1
+    syscall
+
+    # Return to caller
     jr $ra
