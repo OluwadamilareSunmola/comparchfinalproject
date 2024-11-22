@@ -1,674 +1,839 @@
 .data
-    # Game state storage
-    score:      .word 0     # Current score
-    moves:      .word 0     # Number of moves taken
-    remaining:  .word 8     # Number of remaining pairs
-    pair_map:   .word 0:16  # Map to track which answers match which problems
-    
-    # Title and interface messages
-    welcome:    .asciiz "********** Math-Memorization Game **********\nWelcome! Test your memory and your math skills all in one game!\n\n"
-    newline:    .asciiz "\n"
-    divider:    .asciiz "\n********** Display Cards **********\n"
-    status_div: .asciiz "\n----------------------------------------\n"
-    
-    current_score: .word 0
-    current_moves: .word 0
-    remaining_pairs: .word 8
-    
-    
-    # Input prompts
-    check_prompt1: .asciiz "\nEnter position from first grid (1-16): "
-    check_prompt2: .asciiz "Enter corresponding position from second grid (1-16): "
-    continue_msg:  .asciiz "\nWould you like to continue? (1 for yes, 0 for no): "
-    
-    # Game feedback messages
-    match_msg:     .asciiz "\nMatch found!"
-    no_match_msg:  .asciiz "\nNo match. Try again!"
-    already_matched_msg: .asciiz "\nThis position is already matched! Try another position."
-    same_pos_msg:  .asciiz "\nCan't use the same position twice! Try different positions."
-    invalid_msg:   .asciiz "\nInvalid input! Please enter a number between 1 and 16."
-    
-    # Grid display elements
-    hline:      .asciiz "+--------+--------+--------+--------+\n"
-    vline:      .asciiz "|     "  # 5 spaces after |
-    hidden:     .asciiz "*    "   # Hidden value with padding
-    
-    # Status messages
-    score_msg:     .asciiz "\nCurrent Score: "
-    moves_msg:     .asciiz "\nMoves taken: "
-    pairs_left:    .asciiz "\nPairs remaining: "
-    game_complete: .asciiz "\nCongratulations! You've found all matches!"
-    final_score:   .asciiz "\nFinal Score: "
-    final_moves:   .asciiz "\nTotal Moves: "
-    show_match_msg: .asciiz "The matching values are: Problem: "
-    and_answer:    .asciiz " Answer: "
-    
-    # Debug messages (can be removed for production)
-    debug_comparing: .asciiz "\nDEBUG - Comparing: "
-    debug_with:      .asciiz " with answer: "
-    debug_calc:      .asciiz "\nDEBUG - Calculated value: "
-    debug_target:    .asciiz "\nDEBUG - Target answer: "
-    
-    # Game arrays (aligned for word access)
-    .align 2
-    grid1_arr:    .word   0:16    # Problem grid storage
-    grid2_arr:    .word   0:16    # Answer grid storage
-    matched_arr:  .word   0:16    # Matched position tracking
-    
-    # Problem definitions (all padded to 5 chars with spaces)
-    prob1:      .asciiz "4x3  "
-    prob2:      .asciiz "5x2  "
-    prob3:      .asciiz "3x6  "
-    prob4:      .asciiz "4x4  "
-    prob5:      .asciiz "2x8  "
-    prob6:      .asciiz "7x2  "
-    prob7:      .asciiz "3x3  "
-    prob8:      .asciiz "6x2  "
-    prob9:      .asciiz "9    "
-    prob10:     .asciiz "4    "
-    prob11:     .asciiz "8x1  "
-    prob12:     .asciiz "2x5  "
-    prob13:     .asciiz "16   "
-    prob14:     .asciiz "7    "
-    prob15:     .asciiz "3x4  "
-    prob16:     .asciiz "5x3  "
-    
-    # Answer definitions (all padded to 5 chars)
-    ans1:       .asciiz "12   "  # 4x3
-    ans2:       .asciiz "10   "  # 5x2
-    ans3:       .asciiz "18   "  # 3x6
-    ans4:       .asciiz "16   "  # 4x4
-    ans5:       .asciiz "16   "  # 2x8
-    ans6:       .asciiz "14   "  # 7x2
-    ans7:       .asciiz "9    "  # 3x3
-    ans8:       .asciiz "12   "  # 6x2
-    ans9:       .asciiz "9    "  # 9
-    ans10:      .asciiz "4    "  # 4
-    ans11:      .asciiz "8    "  # 8x1
-    ans12:      .asciiz "10   "  # 2x5
-    ans13:      .asciiz "16   "  # 16
-    ans14:      .asciiz "7    "  # 7
-    ans15:      .asciiz "12   "  # 3x4
-    ans16:      .asciiz "15   "  # 5x3
-    
-    # Answer mapping (to track which answer goes with which problem)
-    .align 2
-    answer_map: .word 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
-    
+    brain_art: .asciiz "                       _____\n                   .d88888888bo.\n                 .d8888888888888b.\n                 8888888888888888b\n                 888888888888888888\n                 888888888888888888\n                  Y8888888888888888\n            ,od888888888888888888P\n         .'`Y8P'```'Y8888888888P'\n       .'_   `  _     'Y88888888b\n      /  _`    _ `      Y88888888b   ____\n   _  | /  \\  /  \\      8888888888.d888888b.\n  d8b | | /|  | /|      8888888888d8888888888b\n 8888_\\ \\_|/  \\_|/      d888888888888888888888b\n .Y8P  `'-.            d88888888888888888888888\n/          `          `      `Y8888888888888888\n|                        __    888888888888888P\n \\                       / `   dPY8888888888P'\n  '._                  .'     .'  `Y888888P`\n     `\"'-.,__    ___.-'    .-'\n         `-._````  __..--'`\n                 ``````\n"
+    brain_title:    .asciiz "Welcome to Math Memory Match!\n"
+    display_cards:  .asciiz "\n********** Display Cards **********\n"
+    # Game state variables
+    pairs_remaining: .word 8          # Start with 8 pairs (16 cards)
+    matched_arr:     .word 0:16       # Track revealed cards (0=hidden, 1=revealed)
+    score:          .word 0           # Player's score
 
+    
+    # Timer variables
+    start_time_low:  .word 0          # Low word of start time
+    start_time_high: .word 0          # High word of start time
+    time_msg:       .asciiz "Time elapsed: "
+    colon:          .asciiz ":"
+    zero:           .asciiz "0"
+
+    # Main game banner and frames
+    game_banner:    .asciiz "\n╔════════════════════════════════════════╗\n║  🎮 MATH MEMORY MATCHING CHALLENGE 🎮  ║\n╚════════════════════════════════════════╝\n    🧮 Test Your Math & Memory! 🧠\n"
+    
+    # Basic display elements
+    divider:        .asciiz "\n----------------------------------------\n"
+    newline:        .asciiz "\n"
+    card_separator: .asciiz " | "     # Separates values in grid
+    hidden_card:    .asciiz "*    "   # Hidden card display (5 chars)
+    
+    # Card frame elements
+    card_top:       .asciiz "┌─────┐\n"
+    card_bottom:    .asciiz "└─────┘\n"
+
+    # Stat display frames
+    stats_top:      .asciiz "\n    ┏━━━━━━━━━━━━┓\n"
+    stats_middle:   .asciiz "    ┃ "
+    stats_end:      .asciiz "  ┃\n"
+    stats_bottom:   .asciiz "    ┗━━━━━━━━━━━━┛\n"
+
+    # Progress and victory displays
+    half_way:       .asciiz "\n    ╔═══════════════╗\n    ║ HALFWAY THERE!║\n    ╚═══════════════╝\n"
+    victory_banner: .asciiz "\n    🎉 CONGRATULATIONS! 🎉\n    ┏━━━━━━━━━━━━━━━━━┓\n    ┃  YOU DID IT!!!  ┃\n    ┗━━━━━━━━━━━━━━━━━┛\n"
+
+    # Match messages (rotating)
+    match_msg1:     .asciiz "\n    \\(^o^)// Fantastic!\n"
+    match_msg2:     .asciiz "\n    (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ Amazing!\n"
+    match_msg3:     .asciiz "\n    (╯°□°)╯ Great Job!\n"
+    match_msg4:     .asciiz "\n    ٩(◕‿◕｡)۶ Perfect!\n"
+    
+    # No match messages (rotating)
+    no_match_msg1:  .asciiz "\n    ¯\\_(ツ)_/¯ Try Again!\n"
+    no_match_msg2:  .asciiz "\n    (•_•) Not Quite...\n"
+    no_match_msg3:  .asciiz "\n    (︶︹︺) Almost...\n"
+    no_match_msg4:  .asciiz "\n    (._.) Keep Going!\n"
+
+    # Input prompts and status messages
+    prompt1:        .asciiz "\nSelect first card (1-16): "
+    prompt2:        .asciiz "\nSelect second card (1-16): "
+    match_found:    .asciiz "\nMatch found! +10 points\n"
+    no_match:       .asciiz "\nNo match. Try again!\n"
+    invalid_input:  .asciiz "\nPlease enter a number between 1 and 16\n"
+    already_matched: .asciiz "\nThis card is already matched! Try another.\n"
+    same_card:      .asciiz "\nCannot select the same card! Try again.\n"
+    pairs_msg:      .asciiz "\nPairs remaining: "
+    score_msg:      .asciiz "Score: "
+
+    game_over:      .asciiz "\nCongratulations! You've found all pairs!\n"
+
+    # Card values (all padded to 5 chars)
+    val1:           .asciiz "2x3  "  # 2 × 3 = 6
+    val9:           .asciiz "6    "  # Direct value 6
+    val2:           .asciiz "4x2  "  # 4 × 2 = 8
+    val10:          .asciiz "8    "  # Direct value 8
+    val3:           .asciiz "3x3  "  # 3 × 3 = 9
+    val7:           .asciiz "9    "  # Direct value 9
+    val4:           .asciiz "200  "  # 3 × 4 = 12
+    val6:           .asciiz "200   " # Direct value 12
+    val5:           .asciiz "5x3  "  # 5 × 3 = 15
+    val11:          .asciiz "15   "  # Direct value 15
+    val8:           .asciiz "9x10  " # 4 × 4 = 16
+    val14:          .asciiz "90   "  # Direct value 16
+    val13:          .asciiz "4x5  "  # 4 × 5 = 20
+    val15:          .asciiz "20   "  # Direct value 20
+    val12:          .asciiz "25  "   # 5 × 5 = 25
+    val16:          .asciiz "25   "  # Direct value 25
+
+    # Message arrays for random selection (must be aligned)
+    .align 2
+    grid1:          .word 0:16        # Main grid with all values
+    match_msgs:     .word match_msg1, match_msg2, match_msg3, match_msg4
+    no_match_msgs:  .word no_match_msg1, no_match_msg2, no_match_msg3, no_match_msg4
+    
+    
+        # Card display art
+    card_frame_top:     .asciiz "┌───────┐"
+    card_frame_bottom:  .asciiz "└───────┘"
+    card_frame_side:    .asciiz "│"
+    card_frame_empty:   .asciiz "│   *   │"  # For hidden cards
+    card_matched:       .asciiz "✓ "         # Checkmark for matched pairs
+    card_selected:      .asciiz "→ "         # Arrow for selected card
+    
+    # Celebration art for matches
+    celebration_art1:   .asciiz "\n  🌟 ⭐ 🌟\n"
+    celebration_art2:   .asciiz "\n  ✨ ⚡ ✨\n"
+    
+    # Game progress art
+    progress_bar_start: .asciiz "["
+    progress_bar_end:   .asciiz "]"
+    progress_fill:      .asciiz "■"
+    progress_empty:     .asciiz "□"
+    
+    # Score display art
+    score_frame_top:    .asciiz "╔════════╗\n"
+    score_frame_mid:    .asciiz "║"
+    score_frame_bottom: .asciiz "╚════════╝\n"
+
+    # Timer art
+    timer_art:          .asciiz "⏱️ "
+
+    score_art:          .asciiz "🏆 "
+
+    success_duration: .word 1000    # Duration in milliseconds
+    failure_duration: .word 500     # Duration in milliseconds
+    success_pitch:    .word 72      # High C note
+    failure_pitch:    .word 50      # Lower note
+    success_volume:   .word 127     # Maximum volume
+    failure_volume:   .word 100     # Slightly lower volume
+    success_instrument: .word 9     # Glockenspiel (bright, happy sound)
+    failure_instrument: .word 114   # Steel Drums (distinctive sound)
 .text
 .globl main
 
 main:
-
-
-    li $s7, 0          # Score in $s7
-    li $s6, 0          # Moves in $s6
-    li $s5, 8          # Remaining pairs in $s5
     # Initialize game state
-    sw $zero, score
-    sw $zero, moves
-    li $t0, 8
-    sw $t0, remaining
+    jal init_game
     
-    # Print welcome message
-    li $v0, 4
-    la $a0, welcome
+    # Main game loop
+    game_loop:
+        # Display current state
+        jal display_game_state
+        
+        # Get and process player moves
+        jal get_player_move
+        
+        # Check if game is over
+        jal check_game_over
+        beq $v0, $zero, game_loop    # If not over, continue loop
+        
+    # Game over cleanup and exit
+    jal display_final_results
+    li $v0, 10      # Exit program
     syscall
-    
-    # Initialize game state and arrays
-    jal init_game_state
-    
-    # Enter main game loop
-    j main_loop
 
-# Initialize full game state
-init_game_state:
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
-    
-    # Clear matched array
-    la $t0, matched_arr
-    li $t1, 16         # Counter
-    li $t2, 0          # Clear value
-clear_matched:
-    sw $t2, ($t0)
-    addi $t0, $t0, 4
-    addi $t1, $t1, -1
-    bnez $t1, clear_matched
-    
-    # Initialize both grids
-    jal init_grid1
-    jal init_grid2
-    
-    # Shuffle both grids together
-    jal shuffle_grids
-    
-    # Print initial state
-    jal print_grids
-    
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
-    jr $ra
+# Initialize game state and grid
+init_game:
+    # Prologue
+    li $v0, 30             # System time in milliseconds
+    syscall                # Time in $a0 (low) and $a1 (high)
+    sw $a0, start_time_low     # Store low word
+    sw $a1, start_time_high    # Store high word
 
-# Main game loop
-main_loop:
-    # Load current game state
-    lw $s7, score
-    lw $s6, moves
-    
-    # Get player moves and check match
-    jal check_match
-    
-    # Update game state
-    sw $s7, score
-    sw $s6, moves
-    
-    # Print current state
-    jal print_status
-    
-    # Check if game complete
-    jal check_game_complete
-    bnez $v0, game_end
-    
-    # Ask to continue
-    li $v0, 4
-    la $a0, continue_msg
-    syscall
-    
-    li $v0, 5
-    syscall
-    beqz $v0, game_end     # Exit if 0
-    j main_loop
-
-# Shuffle both grids together maintaining pairs
-shuffle_grids:
-    li $t0, 15          # i = size - 1
-    la $t1, grid1_arr   # base address of grid1
-    la $t4, grid2_arr   # base address of grid2
-    
-shuffle_loop:
-    beqz $t0, shuffle_done
-    
-    # Generate random number from 0 to i
-    li $v0, 42          # random int syscall
-    move $a1, $t0       # upper bound
-    syscall             # random number in $a0
-    
-    # Calculate offsets
-    sll $t2, $t0, 2     # i * 4
-    sll $t3, $a0, 2     # j * 4
-    
-    # Swap elements in both grids
-    # Grid 1
-    add $t5, $t1, $t2   # address i in grid1
-    add $t6, $t1, $t3   # address j in grid1
-    lw $t7, ($t5)       # Load values
-    lw $t8, ($t6)
-    sw $t8, ($t5)       # Swap
-    sw $t7, ($t6)
-    
-    # Grid 2 (same positions)
-    add $t5, $t4, $t2   # address i in grid2
-    add $t6, $t4, $t3   # address j in grid2
-    lw $t7, ($t5)       # Load values
-    lw $t8, ($t6)
-    sw $t8, ($t5)       # Swap
-    sw $t7, ($t6)
-    
-    addi $t0, $t0, -1   # Decrement counter
-    j shuffle_loop
-    
-shuffle_done:
-    jr $ra
-
-# Check if positions match
-# Check if positions match
-check_match:
-    # Save registers
-    addi $sp, $sp, -20
-    sw $ra, 16($sp)
-    sw $s0, 12($sp)
+    addi $sp, $sp, -20    # Allocate stack space for 5 registers
+    sw $ra, 16($sp)       # Save return address at top of frame
+    sw $s0, 12($sp)       # Save preserved registers
     sw $s1, 8($sp)
-    sw $s4, 4($sp)
-    sw $s5, 0($sp)
-    
-    # Get first position
-    li $v0, 4
-    la $a0, check_prompt1
-    syscall
-    li $v0, 5
-    syscall
-    
-    # Validate first input
-    li $t0, 1
-    li $t1, 16
-    blt $v0, $t0, input_error
-    bgt $v0, $t1, input_error
-    
-    addi $t0, $v0, -1      # Convert to 0-based index
-    move $s4, $t0          # Save original position 1
-    
-    # Get second position
-    li $v0, 4
-    la $a0, check_prompt2
-    syscall
-    li $v0, 5
-    syscall
-    
-    # Validate second input
-    li $t0, 1
-    li $t1, 16
-    blt $v0, $t0, input_error
-    bgt $v0, $t1, input_error
-    
-    addi $t1, $v0, -1      # Convert to 0-based index
-    move $s5, $t1          # Save original position 2
-    
-    # Check if same position
-    beq $s4, $s5, same_position
-    
-    addi $s6, $s6, 1    # Increment moves
-    sw $s6, current_moves
-    
-    
-    # Check if positions already matched
-    la $t2, matched_arr
-    sll $t3, $s4, 2
-    add $t3, $t2, $t3
-    lw $t4, ($t3)
-    bnez $t4, already_matched
-    
-    sll $t3, $s5, 2
-    add $t3, $t2, $t3
-    lw $t4, ($t3)
-    bnez $t4, already_matched
-    
-    # Increment moves counter for valid move
-    lw $t0, moves
-    addi $t0, $t0, 1
-    sw $t0, moves
-    
-    # Get values from grids
-    la $t2, grid1_arr
-    la $t3, grid2_arr
-    sll $t0, $s4, 2
-    sll $t1, $s5, 2
-    add $t2, $t2, $t0
-    add $t3, $t3, $t1
-    
-    lw $s0, ($t2)      # Load problem string
-    lw $s1, ($t3)      # Load answer string
-    
-    # Print debug info
-    li $v0, 4
-    la $a0, debug_comparing
-    syscall
-    move $a0, $s0
-    syscall
-    la $a0, debug_with
-    syscall
-    move $a0, $s1
-    syscall
-    
-    # Call evaluate_match
-    move $a0, $s0
-    move $a1, $s1
-    jal evaluate_match
-    
-    # Check result
-    beqz $v0, no_match
-    
-    # Match found - handle match
-    jal handle_match
-    
-    # Print updated grids and status
-    jal print_grids
-    
-    j check_done
+    sw $s2, 4($sp)
+    sw $s3, 0($sp)
 
-# Handle successful match
-handle_match:
-    # Save return address
-    addi $sp, $sp, -4
+    # Display brain ASCII art with dramatic effect
+    li $v0, 4
+    la $a0, brain_art     # Display the brain art
+    syscall
+    
+    # Short pause for dramatic effect
+    li $v0, 32            # Sleep syscall
+    li $a0, 500           # Sleep for 0.5 seconds
+    syscall
+
+    # Display welcome title
+    li $v0, 4
+    la $a0, brain_title
+    syscall
+    
+    # Add visual separator
+    la $a0, divider
+    syscall
+
+    # Initialize game state variables
+    li $t0, 8
+    sw $t0, pairs_remaining
+    sw $zero, score
+
+
+    # Load base addresses into saved registers
+    la $s0, matched_arr   # $s0 = base address of matched_arr
+    la $s1, grid1         # $s1 = base address of grid1
+    li $s2, 16           # $s2 = counter for loop
+    li $s3, 0            # $s3 = current offset/index
+
+init_matched_loop:
+    # Initialize matched_arr to all zeros
+    add $t0, $s0, $s3    # Calculate current address
+    sw $zero, ($t0)      # Store 0 (hidden)
+    addi $s3, $s3, 4     # Increment offset
+    addi $s2, $s2, -1    # Decrement counter
+    bnez $s2, init_matched_loop
+
+    # Initialize grid1 with card values
+    la $t0, val1
+    sw $t0, 0($s1)      # grid1[0] = &val1
+    
+    la $t0, val2
+    sw $t0, 4($s1)      # grid1[1] = &val2
+    
+    la $t0, val3
+    sw $t0, 8($s1)      # grid1[2] = &val3
+    
+    la $t0, val4
+    sw $t0, 12($s1)     # grid1[3] = &val4
+    
+    la $t0, val5
+    sw $t0, 16($s1)     # grid1[4] = &val5
+    
+    la $t0, val6
+    sw $t0, 20($s1)     # grid1[5] = &val6
+    
+    la $t0, val7
+    sw $t0, 24($s1)     # grid1[6] = &val7
+    
+    la $t0, val8
+    sw $t0, 28($s1)     # grid1[7] = &val8
+    
+    la $t0, val9
+    sw $t0, 32($s1)     # grid1[8] = &val9
+    
+    la $t0, val10
+    sw $t0, 36($s1)     # grid1[9] = &val10
+    
+    la $t0, val11
+    sw $t0, 40($s1)     # grid1[10] = &val11
+    
+    la $t0, val12
+    sw $t0, 44($s1)     # grid1[11] = &val12
+    
+    la $t0, val13
+    sw $t0, 48($s1)     # grid1[12] = &val13
+    
+    la $t0, val14
+    sw $t0, 52($s1)     # grid1[13] = &val14
+    
+    la $t0, val15
+    sw $t0, 56($s1)     # grid1[14] = &val15
+    
+    la $t0, val16
+    sw $t0, 60($s1)     # grid1[15] = &val16
+
+    # Shuffle the grid
+    jal shuffle_grid
+
+    # Epilogue
+    lw $s3, 0($sp)       # Restore preserved registers in reverse order
+    lw $s2, 4($sp)
+    lw $s1, 8($sp)
+    lw $s0, 12($sp)
+    lw $ra, 16($sp)      # Restore return address last
+    addi $sp, $sp, 20    # Deallocate stack space
+
+    jr $ra               # Return to caller
+display_game_state:
+   # Prologue
+   addi $sp, $sp, -32        # Space for 8 registers
+   sw $ra, 28($sp)           # Save return address
+   sw $s0, 24($sp)           # Save s0-s6 (need several for grid traversal)
+   sw $s1, 20($sp)
+   sw $s2, 16($sp)
+   sw $s3, 12($sp)
+   sw $s4, 8($sp)
+   sw $s5, 4($sp)
+   sw $s6, 0($sp)
+
+   # Load addresses and initialize counters
+   la $s0, grid1             # $s0 = base of grid1
+   la $s1, matched_arr       # $s1 = base of matched array
+   li $s2, 0                 # $s2 = current position (0-15)
+   li $s3, 4                 # $s3 = items per row
+   li $s4, 0                 # $s4 = current row
+   
+   # Display grid header
+   li $v0, 4
+   la $a0, display_cards
+   syscall
+   
+   # First Grid Display (all values visible)
+first_grid_loop:
+   # Check if we need a new row
+   div $s2, $s3              # divide position by 4
+   mfhi $t0                  # get remainder
+   bnez $t0, skip_newline1   # if not start of row, skip newline
+   
+   # Print newline and divider at start of row
+   li $v0, 4
+   la $a0, newline
+   syscall
+   la $a0, divider
+   syscall
+   
+skip_newline1:
+   # Print separator
+   li $v0, 4
+   la $a0, card_separator
+   syscall
+   
+   # Load and print current value
+   sll $t0, $s2, 2          # multiply position by 4 for offset
+   add $t0, $s0, $t0        # add to base address
+   lw $t1, ($t0)            # load address of string
+   li $v0, 4
+   move $a0, $t1
+   syscall
+   
+   # Increment position and check if done
+   addi $s2, $s2, 1         # increment position
+   li $t0, 16
+   bne $s2, $t0, first_grid_loop
+   
+   # Print final newline and divider
+   li $v0, 4
+   la $a0, newline
+   syscall
+   la $a0, divider
+   syscall
+   
+   # Reset for second grid
+   li $s2, 0                # reset position counter
+   
+   # Display second grid (with hidden cards)
+second_grid_loop:
+   # Check if we need a new row
+   div $s2, $s3             # divide position by 4
+   mfhi $t0                 # get remainder
+   bnez $t0, skip_newline2  # if not start of row, skip newline
+   
+   # Print newline and divider at start of row
+   li $v0, 4
+   la $a0, newline
+   syscall
+   la $a0, divider
+   syscall
+
+skip_newline2:
+   # Print separator
+   li $v0, 4
+   la $a0, card_separator
+   syscall
+   
+   # Check if card is revealed
+   sll $t0, $s2, 2          # multiply position by 4 for offset
+   add $t1, $s1, $t0        # add to matched_arr base
+   lw $t2, ($t1)            # load matched status
+   
+   beqz $t2, print_hidden   # if not matched, print hidden
+   
+   # Card is revealed, print value from grid1
+   add $t1, $s0, $t0        # get grid1 address using original offset
+   lw $t2, ($t1)            # load string address
+   li $v0, 4
+   move $a0, $t2
+   syscall
+   j after_print
+   
+print_hidden:
+   # Print hidden card symbol
+   li $v0, 4
+   la $a0, hidden_card
+   syscall
+   
+after_print:
+   # Increment position and check if done
+   addi $s2, $s2, 1         # increment position
+   li $t0, 16
+   bne $s2, $t0, second_grid_loop
+   
+   # Print final newline and divider
+   li $v0, 4
+   la $a0, newline
+   syscall
+   la $a0, divider
+   syscall
+   
+   # Display game status
+   li $v0, 4
+   la $a0, pairs_msg
+   syscall
+   
+   li $v0, 1
+   lw $a0, pairs_remaining
+   syscall
+   
+   li $v0, 4
+   la $a0, newline
+   syscall
+   la $a0, score_msg
+   syscall
+   
+   li $v0, 1
+   lw $a0, score
+   syscall
+   
+   li $v0, 4
+   la $a0, newline
+   syscall
+
+   
+
+
+   # Epilogue
+   lw $s6, 0($sp)           # Restore all saved registers
+   lw $s5, 4($sp)
+   lw $s4, 8($sp)
+   lw $s3, 12($sp)
+   lw $s2, 16($sp)
+   lw $s1, 20($sp)
+   lw $s0, 24($sp)
+   lw $ra, 28($sp)
+   addi $sp, $sp, 32        # Restore stack pointer
+   
+   jr $ra                   # Return to caller
+
+
+# Shuffle the grid contents
+# Shuffle the grid contents
+shuffle_grid:
+    # Prologue
+    addi $sp, $sp, -28       # Space for 7 registers
+    sw $ra, 24($sp)
+    sw $s0, 20($sp)          # For grid1 base address
+    sw $s1, 16($sp)          # For loop counter
+    sw $s2, 12($sp)          # For current position
+    sw $s3, 8($sp)           # For random position
+    sw $s4, 4($sp)           # For temp storage
+    sw $s5, 0($sp)           # For swapped value
+
+    # Initialize
+    la $s0, grid1            # Load grid base address
+    li $s1, 15               # Start with n-1 (15 for 16 positions)
+
+shuffle_loop:
+    # Check if we should continue
+    bltz $s1, shuffle_done   # If counter < 0, we're done
+
+    # Generate random number from 0 to current position ($s1)
+    li $v0, 42               # Random int syscall
+    li $a0, 0               # Random generator ID
+    addi $a1, $s1, 1        # Upper bound + 1 (make it inclusive and positive)
+    syscall                  # Random number stored in $a0
+    move $s3, $a0            # Save random position
+
+    # Calculate addresses for current and random positions
+    sll $t0, $s1, 2         # Current pos * 4
+    sll $t1, $s3, 2         # Random pos * 4
+    add $t0, $s0, $t0       # Address of current position
+    add $t1, $s0, $t1       # Address of random position
+
+    # Swap values
+    lw $s4, ($t0)           # Load current value
+    lw $s5, ($t1)           # Load random value
+    sw $s5, ($t0)           # Store random value in current position
+    sw $s4, ($t1)           # Store current value in random position
+
+    # Decrement counter
+    addi $s1, $s1, -1       # Decrement counter
+    j shuffle_loop          # Continue shuffling
+
+shuffle_done:
+    # Epilogue
+    lw $s5, 0($sp)
+    lw $s4, 4($sp)
+    lw $s3, 8($sp)
+    lw $s2, 12($sp)
+    lw $s1, 16($sp)
+    lw $s0, 20($sp)
+    lw $ra, 24($sp)
+    addi $sp, $sp, 28
+
+    jr $ra
+
+get_player_move:
+    # Prologue
+    addi $sp, $sp, -28        # Space for 7 registers
+    sw $ra, 24($sp)           # Save return address
+    sw $s0, 20($sp)           # For first card selection
+    sw $s1, 16($sp)           # For second card selection
+    sw $s2, 12($sp)           # For grid1 base address
+    sw $s3, 8($sp)           # For matched_arr base address
+    sw $s4, 4($sp)           # For first card value
+    sw $s5, 0($sp)           # For second card value
+
+    # Load addresses
+    la $s2, grid1            # Load grid base address
+    la $s3, matched_arr      # Load matched array base address
+
+get_first_card:
+    # Prompt for first card
+    li $v0, 4
+    la $a0, prompt1
+    syscall
+
+    # Read input
+    li $v0, 5
+    syscall
+    move $s0, $v0            # Save first selection
+
+    # Validate input (1-16)
+    li $t0, 1
+    li $t1, 16
+    blt $s0, $t0, invalid_input1
+    bgt $s0, $t1, invalid_input1
+
+    # Adjust to 0-based index
+    addi $s0, $s0, -1
+
+    # Check if already matched
+    sll $t0, $s0, 2          # Multiply by 4 for offset
+    add $t0, $s3, $t0
+    lw $t1, ($t0)            # Load matched status
+    bnez $t1, already_matched1
+
+    # Temporarily reveal first card
+    li $t1, 2                # Use 2 to indicate temporarily revealed
+    sw $t1, ($t0)            # Mark card as temporarily revealed
+    
+    # Display current state with first card revealed
+    jal display_game_state
+
+get_second_card:
+    # Prompt for second card
+    li $v0, 4
+    la $a0, prompt2
+    syscall
+
+    # Read input
+    li $v0, 5
+    syscall
+    move $s1, $v0            # Save second selection
+
+    # Validate input (1-16)
+    li $t0, 1
+    li $t1, 16
+    blt $s1, $t0, invalid_input2
+    bgt $s1, $t1, invalid_input2
+
+    # Adjust to 0-based index
+    addi $s1, $s1, -1
+
+    # Check if same as first card
+    beq $s1, $s0, same_card_error
+
+    # Check if already matched
+    sll $t0, $s1, 2          # Multiply by 4 for offset
+    add $t0, $s3, $t0
+    lw $t1, ($t0)            # Load matched status
+    bnez $t1, already_matched2
+
+    # Get values and compare
+    sll $t0, $s0, 2          # First card offset 
+    sll $t1, $s1, 2          # Second card offset
+    add $t0, $s2, $t0        # First card address in grid1
+    add $t1, $s2, $t1        # Second card address in grid1
+    lw $s4, ($t0)            # Load first card string address
+    lw $s5, ($t1)            # Load second card string address
+
+    # Save temporary reveal status for second card
+    sll $t0, $s1, 2
+    add $t0, $s3, $t0
+    li $t1, 2                # Temporarily reveal second card
+    sw $t1, ($t0)
+    
+    # Display both cards
+    jal display_game_state
+
+    # Compare cards
+    move $a0, $s4            # First string address
+    move $a1, $s5            # Second string address
+    jal compare_strings      # Call string comparison function
+    
+    # If no match found
+    beqz $v0, no_match_found
+
+    # Update matched status and score for match
+    sll $t0, $s0, 2
+    sll $t1, $s1, 2
+    add $t0, $s3, $t0
+    add $t1, $s3, $t1
+    li $t2, 1                # 1 for permanent match
+    sw $t2, ($t0)            # Mark first card as matched
+    sw $t2, ($t1)            # Mark second card as matched
+
+    # Play success sound
+    lw $a0, success_pitch
+    lw $a1, success_duration
+    lw $a2, success_instrument
+    lw $a3, success_volume
+    jal play_sound
+
+    # Update score and pairs remaining
+    lw $t0, score
+    addi $t0, $t0, 10        # Add 10 points
+    sw $t0, score
+
+    lw $t0, pairs_remaining
+    addi $t0, $t0, -1        # Decrease pairs remaining
+    sw $t0, pairs_remaining
+
+    # Display match message
+    li $v0, 4
+    la $a0, match_found
+    syscall
+    j move_complete
+
+play_sound:
+    # Parameters:
+    # $a0 = pitch (0-127)
+    # $a1 = duration (ms)
+    # $a2 = instrument (0-127)
+    # $a3 = volume (0-127)
+    
+    # Prologue - save ALL registers that could be affected
+    addi $sp, $sp, -16
+    sw $ra, 12($sp)
+    sw $t0, 8($sp)
+    sw $v0, 4($sp)     # Important: save $v0 as it contains syscall values
+    sw $a0, 0($sp)     # Save original pitch
+    
+    # First set the instrument
+    move $a0, $a2          # Move instrument to $a0 for syscall
+    li $v0, 35             # MIDI set instrument syscall
+    syscall
+    
+    # Restore pitch and play the note
+    lw $a0, 0($sp)         # Restore original pitch
+    li $v0, 31             # MIDI play note syscall
+    syscall
+    
+    # Add a small delay for the sound to play
+    move $t0, $a1          # Save duration
+    li $v0, 32             # Sleep syscall
+    move $a0, $t0          # Move duration to $a0
+    syscall
+    
+    # Epilogue - restore all saved registers
+    lw $a0, 0($sp)
+    lw $v0, 4($sp)
+    lw $t0, 8($sp)
+    lw $ra, 12($sp)
+    addi $sp, $sp, 16
+    jr $ra
+    
+no_match_found:
+    # Save registers that might be affected
+    addi $sp, $sp, -8
+    sw $v0, 4($sp)
     sw $ra, 0($sp)
     
-    # Mark positions as matched
-    la $t2, matched_arr
-    sll $t3, $s4, 2
-    add $t3, $t2, $t3
-    li $t4, 1
-    sw $t4, ($t3)
+    # Clear the temporary reveals
+    sll $t0, $s0, 2
+    add $t0, $s3, $t0
+    sw $zero, ($t0)          # Hide first card
     
-    sll $t3, $s5, 2
-    add $t3, $t2, $t3
-    sw $t4, ($t3)
-    
-    # Update score atomically
-    lw $t0, score
-    addi $t0, $t0, 10
-    sw $t0, score
-    
-    addi $s7, $s7, 10    # Add 10 points
-    sw $s7, current_score
-    addi $s5, $s5, -1    # Decrease remaining pairs
-    sw $s5, remaining_pairs
-    
-    # Update remaining pairs atomically
-    lw $t0, remaining
-    addi $t0, $t0, -1
-    sw $t0, remaining
-    
-    # Print match message and current score
+    sll $t0, $s1, 2
+    add $t0, $s3, $t0
+    sw $zero, ($t0)          # Hide second card
+   
+    # Display no match message
     li $v0, 4
-    la $a0, match_msg
-    syscall
-    la $a0, score_msg
-    syscall
-    li $v0, 1
-    lw $a0, score
+    la $a0, no_match
     syscall
     
-    # Print newline
-    li $v0, 4
-    la $a0, newline
-    syscall
+    # Play failure sound
+    lw $a0, failure_pitch
+    lw $a1, failure_duration
+    lw $a2, failure_instrument
+    lw $a3, failure_volume
+    jal play_sound
     
-    # Restore return address
+    # Restore registers
     lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $v0, 4($sp)
+    addi $sp, $sp, 8
+    
+    j move_complete
+    
+move_complete:
+    # Update moves counter
+    #lw $t0, moves
+    #addi $t0, $t0, 1
+    #sw $t0, moves           # Save updated moves count
+
+    # Display updated game state
+    jal display_game_state  # This will show moves in the regular display
+
+    # Epilogue
+    lw $s5, 0($sp)
+    lw $s4, 4($sp)
+    lw $s3, 8($sp)
+    lw $s2, 12($sp)
+    lw $s1, 16($sp)
+    lw $s0, 20($sp)
+    lw $ra, 24($sp)
+    addi $sp, $sp, 28
     jr $ra
 
 # Error handlers
-no_match:
+invalid_input1:
     li $v0, 4
-    la $a0, no_match_msg
+    la $a0, invalid_input
     syscall
-    j check_done
+    j get_first_card
 
-same_position:
+invalid_input2:
+    # Clear temporary reveal of first card
+    sll $t0, $s0, 2
+    add $t0, $s3, $t0
+    sw $zero, ($t0)          # Hide first card
+   
     li $v0, 4
-    la $a0, same_pos_msg
+    la $a0, invalid_input
     syscall
-    j check_done
+    j get_second_card
 
-already_matched:
+already_matched1:
     li $v0, 4
-    la $a0, already_matched_msg
+    la $a0, already_matched
     syscall
-    j check_done
+    j get_first_card
 
-input_error:
+already_matched2:
+    # Clear temporary reveal of first card
+    sll $t0, $s0, 2
+    add $t0, $s3, $t0
+    sw $zero, ($t0)          # Hide first card
+   
     li $v0, 4
-    la $a0, invalid_msg
+    la $a0, already_matched
     syscall
-    j check_done
+    j get_second_card
 
-check_done:
-    # Restore registers
-    lw $ra, 16($sp)
-    lw $s0, 12($sp)
-    lw $s1, 8($sp)
-    lw $s4, 4($sp)
-    lw $s5, 0($sp)
-    addi $sp, $sp, 20
-    jr $ra
-# Evaluate if values match
-evaluate_match:
-    # Save return address
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
-    
-    # Save strings
-    move $t0, $a0      # Problem string
-    move $t7, $a1      # Answer string
-    
-    # First calculate problem result
-    lb $t1, ($t0)      # Load first digit
-    addi $t1, $t1, -48 # Convert ASCII to number
-    
-    # Check if it's multiplication (has 'x')
-    lb $t2, 1($t0)     # Load second character
-    li $t3, 0x78       # ASCII for 'x'
-    bne $t2, $t3, single_number
-    
-    # Handle multiplication
-    lb $t2, 2($t0)     # Load digit after 'x'
-    addi $t2, $t2, -48 # Convert to number
-    mul $t4, $t1, $t2  # Multiply numbers
-    
-    # Debug - print calculated value
+same_card_error:
+    # Clear temporary reveal of first card
+    sll $t0, $s0, 2
+    add $t0, $s3, $t0
+    sw $zero, ($t0)          # Hide first card
+   
     li $v0, 4
-    la $a0, debug_calc
+    la $a0, same_card
     syscall
-    li $v0, 1
-    move $a0, $t4
-    syscall
-    j get_answer
-    
-single_number:
-    move $t4, $t1      # Just use the single number
-    # Debug - print single number
-    li $v0, 4
-    la $a0, debug_calc
-    syscall
-    li $v0, 1
-    move $a0, $t4
-    syscall
-    
-get_answer:
-    # Get answer number
-    lb $t5, ($t7)      # First digit
-    addi $t5, $t5, -48
-    
-    # Check for second digit
-    lb $t6, 1($t7)
-    blt $t6, 0x30, single_digit  # Not a number
-    bgt $t6, 0x39, single_digit  # Not a number
-    # Handle two-digit number
-    addi $t6, $t6, -48
-    li $t8, 10
-    mul $t5, $t5, $t8
-    add $t5, $t5, $t6
-    
-single_digit:
-    # Debug - print target answer
-    li $v0, 4
-    la $a0, debug_target
-    syscall
-    li $v0, 1
-    move $a0, $t5
-    syscall
-    li $v0, 4
-    la $a0, newline
-    syscall
-    
-    # Compare results
-    seq $v0, $t4, $t5  # Set to 1 if equal, 0 if not
-    
-    # Restore return address
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
-    jr $ra
+    j get_second_card
 
-# Initialize grid1
-init_grid1:
-    la $t0, grid1_arr
-    
-    # Store problem addresses
-    la $t2, prob1
-    sw $t2, 0($t0)
-    la $t2, prob2
-    sw $t2, 4($t0)
-    la $t2, prob3
-    sw $t2, 8($t0)
-    la $t2, prob4
-    sw $t2, 12($t0)
-    la $t2, prob5
-    sw $t2, 16($t0)
-    la $t2, prob6
-    sw $t2, 20($t0)
-    la $t2, prob7
-    sw $t2, 24($t0)
-    la $t2, prob8
-    sw $t2, 28($t0)
-    la $t2, prob9
-    sw $t2, 32($t0)
-    la $t2, prob10
-    sw $t2, 36($t0)
-    la $t2, prob11
-    sw $t2, 40($t0)
-    la $t2, prob12
-    sw $t2, 44($t0)
-    la $t2, prob13
-    sw $t2, 48($t0)
-    la $t2, prob14
-    sw $t2, 52($t0)
-    la $t2, prob15
-    sw $t2, 56($t0)
-    la $t2, prob16
-    sw $t2, 60($t0)
-    
-    jr $ra
-
-# Initialize grid2
-init_grid2:
-    la $t0, grid2_arr
-    
-    # Store answer addresses
-    la $t2, ans1
-    sw $t2, 0($t0)
-    la $t2, ans2
-    sw $t2, 4($t0)
-    la $t2, ans3
-    sw $t2, 8($t0)
-    la $t2, ans4
-    sw $t2, 12($t0)
-    la $t2, ans5
-    sw $t2, 16($t0)
-    la $t2, ans6
-    sw $t2, 20($t0)
-    la $t2, ans7
-    sw $t2, 24($t0)
-    la $t2, ans8
-    sw $t2, 28($t0)
-    la $t2, ans9
-    sw $t2, 32($t0)
-    la $t2, ans10
-    sw $t2, 36($t0)
-    la $t2, ans11
-    sw $t2, 40($t0)
-    la $t2, ans12
-    sw $t2, 44($t0)
-    la $t2, ans13
-    sw $t2, 48($t0)
-    la $t2, ans14
-    sw $t2, 52($t0)
-    la $t2, ans15
-    sw $t2, 56($t0)
-    la $t2, ans16
-    sw $t2, 60($t0)
-    
-    jr $ra
-# Print both grids
-print_grids:
-    # Save return address and $s3
-    addi $sp, $sp, -8
-    sw $ra, 4($sp)
-    sw $s3, 0($sp)
-    
-    # Print grid1 (problems)
-    li $s3, 0              # Flag: 0 for problems (show actual values)
-    la $t0, grid1_arr
-    jal print_single_grid
-    
-    # Print divider
-    li $v0, 4
-    la $a0, divider
-    syscall
-    
-    # Print grid2 (answers) with asterisks for unmatched
-    li $s3, 1              # Flag: 1 for answers (show asterisks)
-    la $t0, grid2_arr
-    jal print_single_grid
-    
-    # Restore and return
-    lw $s3, 0($sp)
-    lw $ra, 4($sp)
-    addi $sp, $sp, 8
-    jr $ra
-
-# Print a single 4x4 grid
-print_single_grid:
-    # Save registers
+# Convert string to value
+string_to_value:
+    # Prologue
     addi $sp, $sp, -16
     sw $ra, 12($sp)
-    sw $s0, 8($sp)
-    sw $s1, 4($sp)
-    sw $s2, 0($sp)
+    sw $s0, 8($sp)          # String address
+    sw $s1, 4($sp)          # Result
+    sw $s2, 0($sp)          # Temp storage
+
+    move $s0, $a0           # Save string address
+    li $s1, 0              # Initialize result
+
+    # First, try to find multiplication 'x'
+    li $t2, 0              # Position counter
+    move $t3, $s0          # Working copy of string address
+
+find_x:
+    lb $t0, ($t3)          # Load character
+    beqz $t0, convert_direct # End of string, must be direct number
+    beq $t0, 32, convert_direct # Space found, must be direct number
+    li $t1, 'x'
+    beq $t0, $t1, handle_multiplication # 'x' found
+    addi $t2, $t2, 1       # Increment position counter
+    addi $t3, $t3, 1       # Move to next character
+    j find_x
+
+convert_direct:
+    # Convert direct number
+    move $t3, $s0          # Reset to start of string
+convert_loop:
+    lb $t0, ($t3)          # Load character
+    beq $t0, 32, convert_end   # Check for space
+    beqz $t0, convert_end      # Check for null
+    bltu $t0, '0', convert_end # Check if not a number
+    bgtu $t0, '9', convert_end
     
-    move $s1, $t0       # Save grid base address
-    li $s2, 0          # Counter
+    addi $t0, $t0, -48     # Convert ASCII to number
+    li $t1, 10
+    mul $s1, $s1, $t1      # Multiply current result by 10
+    add $s1, $s1, $t0      # Add new digit
     
-    # Print top border
-    li $v0, 4
-    la $a0, hline
-    syscall
-    
-print_loop:
-    li $t2, 16
-    beq $s2, $t2, print_done   # if printed all elements, done
-    
-    # Print vertical line with spacing
-    li $v0, 4
-    la $a0, vline
-    syscall
-    
-    # Check if showing value or asterisk
-    beqz $s3, print_value    # If grid1, show value
-    
-    # For grid2, check if position is matched
-    move $t0, $s2
-    la $t1, matched_arr
-    sll $t0, $t0, 2
-    add $t1, $t1, $t0
-    lw $t2, ($t1)
-    bnez $t2, print_value
-    
-    # Print asterisk for unmatched answers
-    li $v0, 4
-    la $a0, hidden
-    j after_print
-    
-print_value:
-    # Print actual value
-    lw $a0, ($s1)
-    li $v0, 4
-    
-after_print:
-    syscall
-    
-    # Check for end of row
-    addi $t3, $s2, 1
-    rem $t3, $t3, 4
-    bnez $t3, continue_print
-    
-    # End of row - print closing
-    li $v0, 4
-    la $a0, vline      
-    syscall
-    la $a0, newline
-    syscall
-    la $a0, hline
-    syscall
-    
-continue_print:
-    addi $s1, $s1, 4   # Next element
-    addi $s2, $s2, 1   # Increment counter
-    j print_loop
-    
-print_done:
-    # Restore registers
+    addi $t3, $t3, 1       # Move to next character
+    j convert_loop
+
+handle_multiplication:
+    # Get first number (before 'x')
+    li $t4, 0              # First number
+    move $t3, $s0          # Reset to start of string
+
+first_number_loop:
+    lb $t0, ($t3)          # Load character
+    li $t1, 'x'
+    beq $t0, $t1, handle_second_number  # Found 'x'
+    addi $t0, $t0, -48     # Convert ASCII to number
+    li $t1, 10
+    mul $t4, $t4, $t1      # Multiply current by 10
+    add $t4, $t4, $t0      # Add new digit
+    addi $t3, $t3, 1       # Move to next character
+    j first_number_loop
+
+handle_second_number:
+    addi $t3, $t3, 1       # Skip past 'x'
+    li $t5, 0              # Second number
+
+second_number_loop:
+    lb $t0, ($t3)          # Load character
+    beq $t0, 32, multiply_numbers   # Space found
+    beqz $t0, multiply_numbers      # End of string
+    addi $t0, $t0, -48     # Convert ASCII to number
+    li $t1, 10
+    mul $t5, $t5, $t1      # Multiply current by 10
+    add $t5, $t5, $t0      # Add new digit
+    addi $t3, $t3, 1       # Move to next character
+    j second_number_loop
+
+multiply_numbers:
+    mul $s1, $t4, $t5      # Multiply the two numbers
+
+convert_end:
+    move $v0, $s1          # Return result
+
+    # Epilogue
     lw $s2, 0($sp)
     lw $s1, 4($sp)
     lw $s0, 8($sp)
@@ -676,85 +841,183 @@ print_done:
     addi $sp, $sp, 16
     jr $ra
 
-# Print current game status
-print_status:
-    # Save return address
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+# Compare strings by evaluating their values
+compare_strings:
+    # Prologue
+    addi $sp, $sp, -20
+    sw $ra, 16($sp)
+    sw $s0, 12($sp)        # First string
+    sw $s1, 8($sp)         # Second string
+    sw $s2, 4($sp)         # First value
+    sw $s3, 0($sp)         # Second value
+
+    # Save string addresses
+    move $s0, $a0
+    move $s1, $a1
+
+    # Convert first string to value
+    move $a0, $s0
+    jal string_to_value
+    move $s2, $v0          # Save first value
+
+    # Convert second string to value
+    move $a0, $s1
+    jal string_to_value
+    move $s3, $v0          # Save second value
+
+    # Compare values
+    seq $v0, $s2, $s3      # Set $v0 to 1 if values are equal
+
+    # Epilogue
+    lw $s3, 0($sp)
+    lw $s2, 4($sp)
+    lw $s1, 8($sp)
+    lw $s0, 12($sp)
+    lw $ra, 16($sp)
+    addi $sp, $sp, 20
+    jr $ra
+
+# Check if game is over
+check_game_over:
+    # Prologue
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
+
+    # Load pairs remaining
+    lw $s0, pairs_remaining
     
-    # Print score
+    # Check if all pairs found
+    beqz $s0, game_is_over
+    
+    # Game not over
+    li $v0, 0
+    j check_done
+
+game_is_over:
+    # Display game over message
     li $v0, 4
+    la $a0, game_over
+    syscall
+    
+    # Game is over
+    li $v0, 1
+
+check_done:
+    # Epilogue
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
+    jr $ra
+
+# Display final results
+display_final_results:
+    # Prologue
+    addi $sp, $sp, -24       # Space for 6 registers
+    sw $ra, 20($sp)
+    sw $s0, 16($sp)         # For calculations
+    sw $s1, 12($sp)         # For minutes
+    sw $s2, 8($sp)          # For seconds
+    sw $s3, 4($sp)          # For start time low
+    sw $s4, 0($sp)          # For start time high
+
+    # Get end time
+    li $v0, 30              # System time in milliseconds
+    syscall                 # Time in $a0 (low) and $a1 (high)
+    
+    # Load start time
+    lw $s3, start_time_low      # Load low word
+    lw $s4, start_time_high    # Load high word
+    
+    # Calculate elapsed time in milliseconds
+    subu $s0, $a0, $s3      # Subtract low words
+    
+    # Convert to seconds
+    div $s0, $s0, 1000      # Convert milliseconds to seconds
+    mflo $s0                # Get seconds result
+    
+    # Calculate minutes and seconds
+    li $t0, 60
+    div $s0, $t0            # Divide total seconds by 60
+    mflo $s1                # Minutes in $s1
+    mfhi $s2                # Seconds in $s2
+
+    # Print game over message
+    li $v0, 4
+    la $a0, game_over
+    syscall
+    
+    # Print divider
+    la $a0, divider
+    syscall
+
+    # Display final score
     la $a0, score_msg
     syscall
     li $v0, 1
     lw $a0, score
     syscall
     
-    # Print moves
+    # Print newline
     li $v0, 4
-    la $a0, moves_msg
+    la $a0, newline
     syscall
-    li $v0, 1
-    lw $a0, moves
-    syscall
-    
-    # Print remaining pairs
-    li $v0, 4
-    la $a0, pairs_left
-    syscall
-    li $v0, 1
-    lw $a0, remaining
-    syscall
-    
+
     # Print newline
     li $v0, 4
     la $a0, newline
     syscall
     
-    # Restore and return
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
-    jr $ra
-
-# Check if game is complete
-check_game_complete:
-    # Return 1 if complete, 0 if not
-    lw $t0, remaining
-    seq $v0, $t0, $zero
-    
-    # If not complete, return
-    beqz $v0, check_complete_done
-    
-    # Game is complete - print final messages
-    li $v0, 4
-    la $a0, game_complete
+    # Display elapsed time
+    la $a0, time_msg
     syscall
     
-    la $a0, final_score
+    # Print minutes with leading zero if needed
+    li $v0, 1
+    move $a0, $s1
+    bge $s1, 10, print_minutes
+    
+    # Print leading zero for minutes
+    li $v0, 4
+    la $a0, zero
     syscall
     li $v0, 1
-    lw $a0, score
+    move $a0, $s1
+    
+print_minutes:
     syscall
     
+    # Print colon
     li $v0, 4
-    la $a0, final_moves
+    la $a0, colon
+    syscall
+    
+    # Print seconds with leading zero if needed
+    li $v0, 1
+    move $a0, $s2
+    bge $s2, 10, print_seconds
+    
+    # Print leading zero for seconds
+    li $v0, 4
+    la $a0, zero
     syscall
     li $v0, 1
-    lw $a0, moves
+    move $a0, $s2
+    
+print_seconds:
     syscall
     
+    # Print final newline
     li $v0, 4
     la $a0, newline
     syscall
-    
-check_complete_done:
-    jr $ra
 
-# Game end handling
-game_end:
-    # Print final stats
-    jal print_status
-    
-    # Exit program
-    li $v0, 10
-    syscall
+    # Epilogue
+    lw $s4, 0($sp)
+    lw $s3, 4($sp)
+    lw $s2, 8($sp)
+    lw $s1, 12($sp)
+    lw $s0, 16($sp)
+    lw $ra, 20($sp)
+    addi $sp, $sp, 24
+    jr $ra
