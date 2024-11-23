@@ -99,31 +99,34 @@
 .text
 .globl main
 
+#Start the game
 main:
     j game_start
 
+#Initializes the game
 game_start:
     jal init_game
+# Starts game loop
 game_loop:
-    jal display_game_state
-    jal get_player_move
-    jal check_game_over
+    jal display_game_state # If user won, quit, or is still playing
+    jal get_player_move # REceive player's moves
+    jal check_game_over # check if the game has ended
     beq $v0, $zero, game_loop
     
-    jal display_final_results
+    jal display_final_results #displays final results
     li $v0, SysPrintString
-    la $a0, restart_prompt
+    la $a0, restart_prompt #prompts the user to restart the game
     syscall
     
     li $v0, SysReadInt
     syscall
     
-    beqz $v0, end_game
+    beqz $v0, end_game #ends the game
     li $t0, 1
-    beq $v0, $t0, game_start
+    beq $v0, $t0, game_start#starts the game
     
     li $v0, SysPrintString
-    la $a0, invalid_restart
+    la $a0, invalid_restart #restart is invalid
     syscall
     j game_loop
     
@@ -164,7 +167,7 @@ init_matched_loop:
     bnez $s2, init_matched_loop
 
     # Set up card values
-    la $t0, val1
+    la $t0, val1 
     sw $t0, 0($s1)
     la $t0, val2
     sw $t0, 4($s1)
@@ -197,7 +200,7 @@ init_matched_loop:
     la $t0, val16
     sw $t0, 60($s1)
 
-    jal shuffle_grid
+    jal shuffle_grid #function to shuffle the grid
 
     lw $s3, 0($sp)
     lw $s2, 4($sp)
@@ -209,6 +212,7 @@ init_matched_loop:
 
 # Modified display_game_state to show single grid
 display_game_state:
+#Uses stack to setup grid
     addi $sp, $sp, -32
     sw $ra, 28($sp)
     sw $s0, 24($sp)
@@ -239,6 +243,7 @@ display_game_state:
     sw $zero, show_header
 
 grid_display:
+#displays the grid
     div $s2, $s3
     mfhi $t0
     bnez $t0, skip_newline
@@ -250,6 +255,7 @@ grid_display:
     syscall
 
 skip_newline:
+#skips to the new line
     li $v0, SysPrintString
     la $a0, card_separator
     syscall
@@ -258,7 +264,7 @@ skip_newline:
     add $t1, $s1, $t0
     lw $t2, ($t1)
 
-    beqz $t2, print_hidden
+    beqz $t2, print_hidden  #prints * 
 
     add $t1, $s0, $t0
     lw $t2, ($t1)
@@ -268,11 +274,13 @@ skip_newline:
     j after_print
 
 print_hidden:
+#prints * cards
     li $v0, SysPrintString
     la $a0, hidden_card
     syscall
 
 after_print:
+#displays updated grid after values are shown
     addi $s2, $s2, 1
     li $t0, 16
     bne $s2, $t0, grid_display
@@ -287,7 +295,7 @@ after_print:
     syscall
 
     li $v0, SysPrintInt
-    lw $a0, pairs_remaining
+    lw $a0, pairs_remaining #shows how many pairs remain
     syscall
 
     li $v0, SysPrintString
@@ -330,6 +338,7 @@ shuffle_grid:
     li $s1, 15
 
 shuffle_loop:
+#Fisher-Yates Shuffle Algorithm
     bltz $s1, shuffle_done
 
     li $v0, SysRandIntRange
@@ -352,6 +361,7 @@ shuffle_loop:
     j shuffle_loop
 
 shuffle_done:
+#Shuffle completes
     lw $s5, 0($sp)
     lw $s4, 4($sp)
     lw $s3, 8($sp)
@@ -509,7 +519,7 @@ check_second_value:
     sw $t2, ($t0)
     sw $t2, ($t1)
 
-    # Success effects
+    # Success sound effects
     lw $a0, success_pitch
     lw $a1, success_duration
     lw $a2, success_instrument
@@ -544,24 +554,28 @@ skip_halfway:
 
 # Error handlers
 invalid_char_error:
+#User entered a non-number 
     li $v0, SysPrintString
     la $a0, invalid_char
     syscall
     j get_first_card
 
 invalid_char_error2:
+#User entered a non-number 
     li $v0, SysPrintString
     la $a0, invalid_char
     syscall
     j get_second_card
 
 invalid_input1:
+#User entered a number out-of-range
     li $v0, SysPrintString
     la $a0, invalid_input
     syscall
     j get_first_card
 
 invalid_input2:
+#User entered a number out-of-range
     sll $t0, $s0, 2
     add $t0, $s3, $t0
     sw $zero, ($t0)
@@ -571,12 +585,14 @@ invalid_input2:
     j get_second_card
 
 already_matched1:
+#User entered an index that has already been matched
     li $v0, SysPrintString
     la $a0, already_matched
     syscall
     j get_first_card
 
 already_matched2:
+#User entered an index that has already been matched
     sll $t0, $s0, 2
     add $t0, $s3, $t0
     sw $zero, ($t0)
@@ -586,6 +602,7 @@ already_matched2:
     j get_second_card
 
 same_card_error:
+#User entered the same index twice
     sll $t0, $s0, 2
     add $t0, $s3, $t0
     sw $zero, ($t0)
@@ -595,6 +612,7 @@ same_card_error:
     j get_second_card
 
 no_match_found:
+#No match detected, cards are returned to hidden state
     addi $sp, $sp, -8
     sw $v0, 4($sp)
     sw $ra, 0($sp)
@@ -608,13 +626,13 @@ no_match_found:
     sw $zero, ($t0)
    
     # Show random message
-    li $v0, 42
+    li $v0, SysRandIntRange
     li $a0, 0
     li $a1, SysPrintString
     syscall
     
     sll $t0, $a0, 2
-    la $t1, no_match_msgs
+    la $t1, no_match_msgs #displays a message detailing a match has not been made
     add $t1, $t1, $t0
     lw $a0, ($t1)
     li $v0, SysPrintString
@@ -638,6 +656,7 @@ no_match_found:
     j move_complete
 
 move_complete:
+# player move has been logged and game continues advancing
     jal display_game_state
 
     lw $s5, 0($sp)
@@ -734,6 +753,7 @@ convert_end:
     jr $ra
 
 play_sound:
+#determines which sound to play for the user
     addi $sp, $sp, -16
     sw $ra, 12($sp)
     sw $t0, 8($sp)
@@ -763,6 +783,7 @@ play_sound:
        
              
 calculate_move_time:
+#subtracts time of game start from time of submitted move 
     addi $sp, $sp, -4
     sw $ra, 0($sp)
 
@@ -810,6 +831,7 @@ calculate_move_time:
     jr $ra
 
 compare_strings:
+#Compares string values of user input
     addi $sp, $sp, -20
     sw $ra, 16($sp)
     sw $s0, 12($sp)
@@ -839,6 +861,7 @@ compare_strings:
     jr $ra
 
 check_game_over:
+#determines if the game has ended or not
     addi $sp, $sp, -8
     sw $ra, 4($sp)
     sw $s0, 0($sp)
@@ -849,15 +872,18 @@ check_game_over:
     j check_done
 
 game_is_over:
+#game has concluded
     li $v0, 1
 
 check_done:
+#checks to see if game has concluded
     lw $s0, 0($sp)
     lw $ra, 4($sp)
     addi $sp, $sp, 8
     jr $ra
 
 display_final_results:
+#displays users move counts, score, and total time elapsed
     addi $sp, $sp, -24
     sw $ra, 20($sp)
     sw $s0, 16($sp)
@@ -910,6 +936,7 @@ display_final_results:
     move $a0, $s1
 
 print_minutes:
+#displays timer minutes
     syscall
     li $v0, SysPrintString
     la $a0, colon
@@ -925,6 +952,7 @@ print_minutes:
     move $a0, $s2
 
 print_seconds:
+#displays timer seconds
     syscall
     li $v0, SysPrintString
     la $a0, newline
@@ -940,6 +968,7 @@ print_seconds:
     jr $ra
 
 end_game:
+#ends the game
     li $v0, SysPrintString
     la $a0, goodbye_msg
     syscall
